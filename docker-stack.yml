@@ -1,0 +1,60 @@
+version: '3.1'
+services:
+  web:
+    depends_on:
+      - wordpress
+    image: ankitjethi/mynginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx_logs:/var/log/nginx         #FIX
+      - nginx_cache:/var/cache/nginx/blog
+      - wp_data:/var/www/html
+    networks:
+      - net
+  wordpress:
+    depends_on:
+      - db
+    image: wordpress:5.4.1-php7.4-fpm-alpine
+    volumes:
+      - wp_data:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wp-db-user
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/wp_db_password
+      WORDPRESS_DB_NAME: wp-db
+    networks:
+      - net
+    secrets:
+      - source: wp_db_password
+        mode: 0400
+  db:
+    image: mariadb:10.3.23-bionic
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_DATABASE: wp-db
+      MYSQL_USER: wp-db-user
+      MYSQL_PASSWORD_FILE: /run/secrets/wp_db_password
+    networks:
+      - net
+    secrets:
+      - source: mysql_root_password
+        mode: 0400
+      - source: wp_db_password
+        mode: 0400
+
+volumes:
+  nginx_logs:
+  nginx_cache:
+  wp_data:
+  db_data:
+networks:
+  net:
+secrets:
+  mysql_root_password:
+    external: true
+  wp_db_password:
+    external: true
