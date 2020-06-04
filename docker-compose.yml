@@ -31,8 +31,7 @@ services:
     networks:
       - net
     secrets:
-      - source: wp_db_password
-        mode: 0400
+      - wp_db_password
   db:
     container_name: db
     image: mariadb:10.3.23-bionic
@@ -46,10 +45,8 @@ services:
     networks:
       - net
     secrets:
-      - source: mysql_root_password
-        mode: 0400
-      - source: wp_db_password
-        mode: 0400
+      - mysql_root_password
+      - wp_db_password
 
 volumes:
   nginx_logs:
@@ -60,7 +57,6 @@ networks:
   net:
 secrets:
   mysql_root_password:
-    external: true
+    file: mysql_root_password.txt
   wp_db_password:
-    external: true
-
+    file: wp_db_password.txt
