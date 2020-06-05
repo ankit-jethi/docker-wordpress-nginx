@@ -1,4 +1,4 @@
-version: '3.1'
+version: '3.4'
 services:
   web:
     depends_on:
@@ -13,6 +13,16 @@ services:
       - wp_data:/var/www/html
     networks:
       - net
+    deploy:
+      replicas: 4
+      update_config:
+        order: start-first
+        parallelism: 2
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
   wordpress:
     depends_on:
       - db
@@ -45,11 +55,15 @@ services:
         mode: 0400
       - source: wp_db_password
         mode: 0400
+    deploy:
+      placement:
+        constraints: [node.role == manager]
 
 volumes:
   nginx_logs:
   nginx_cache:
   wp_data:
+    driver: rexray/efs
   db_data:
 networks:
   net:
