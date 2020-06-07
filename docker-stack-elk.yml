@@ -1,0 +1,117 @@
+version: '3.4'
+services:
+  web:
+    depends_on:
+      - wordpress
+    image: ankitjethi/mynginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx_cache:/var/cache/nginx/blog
+      - wp_data:/var/www/html
+    networks:
+      - net
+    deploy:
+      replicas: 3
+      update_config:
+        order: start-first
+        parallelism: 2
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 20s
+      placement:
+        constraints: [node.role == worker]
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "nginx"
+  wordpress:
+    depends_on:
+      - db
+    image: wordpress:5.4.1-php7.4-fpm-alpine
+    volumes:
+      - wp_data:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wp-db-user
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/wp_db_password
+      WORDPRESS_DB_NAME: wp-db
+    networks:
+      - net
+    secrets:
+      - source: wp_db_password
+        mode: 0400
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "wordpress"
+    deploy:
+      placement:
+        constraints: [node.role == worker]
+  db:
+    depends_on:
+      - elk  
+    image: mariadb:10.3.23-bionic
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_DATABASE: wp-db
+      MYSQL_USER: wp-db-user
+      MYSQL_PASSWORD_FILE: /run/secrets/wp_db_password
+    networks:
+      - net
+    secrets:
+      - source: mysql_root_password
+        mode: 0400
+      - source: wp_db_password
+        mode: 0400
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "mariadb"
+  elk:  
+    image: sebp/elk:771
+    ports:
+      - "5601:5601"
+      - "9200:9200"
+      - "5044:5044"
+      - "12201:12201/udp"
+    volumes:
+      - elk_data:/var/lib/elasticsearch
+    environment:
+      ES_CONNECT_RETRY: 60
+    networks:
+      - net
+    configs:
+      - source: logstash_docker
+        target: /etc/logstash/conf.d/logstash_docker.conf
+        mode: 0444
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+volumes:
+  nginx_cache:
+  wp_data:
+    driver: rexray/efs
+  db_data:
+  elk_data:
+networks:
+  net:
+secrets:
+  mysql_root_password:
+    external: true
+  wp_db_password:
+    external: true
+configs:
+  logstash_docker:
+    file: logstash_docker.conf
