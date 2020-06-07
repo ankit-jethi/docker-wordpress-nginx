@@ -11,7 +11,6 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - nginx_logs:/var/log/nginx         #FIX
       - nginx_cache:/var/cache/nginx/blog
       - wp_data:/var/www/html
     networks:
@@ -49,7 +48,6 @@ services:
       - wp_db_password
 
 volumes:
-  nginx_logs:
   nginx_cache:
   wp_data:
   db_data:
