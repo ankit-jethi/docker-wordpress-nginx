@@ -1,0 +1,97 @@
+version: '3.1'
+services:
+  web:
+    depends_on:
+      - wordpress
+    container_name: web
+    image: ankitjethi/mynginx:latest
+    build:
+      context: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx_cache:/var/cache/nginx/blog
+      - wp_data:/var/www/html
+    networks:
+      - net
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "nginx"
+  wordpress:
+    depends_on:
+      - db
+    container_name: wordpress
+    image: wordpress:5.4.1-php7.4-fpm-alpine
+    volumes:
+      - wp_data:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wp-db-user
+      WORDPRESS_DB_PASSWORD_FILE: /run/secrets/wp_db_password
+      WORDPRESS_DB_NAME: wp-db
+    networks:
+      - net
+    secrets:
+      - wp_db_password
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "wordpress"
+  db:
+    depends_on:
+      - elk
+    container_name: db
+    image: mariadb:10.3.23-bionic
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_DATABASE: wp-db
+      MYSQL_USER: wp-db-user
+      MYSQL_PASSWORD_FILE: /run/secrets/wp_db_password
+    networks:
+      - net
+    secrets:
+      - mysql_root_password
+      - wp_db_password
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "mariadb"
+  elk:  
+    container_name: elk
+    image: sebp/elk:771
+    ports:
+      - "5601:5601"
+      - "9200:9200"
+      - "5044:5044"
+      - "12201:12201/udp"
+    volumes:
+      - elk_data:/var/lib/elasticsearch
+      - ./logstash_docker.conf:/etc/logstash/conf.d/logstash_docker.conf
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 65536
+    environment:
+      ES_CONNECT_RETRY: 60
+    networks:
+      - net
+
+volumes:
+  nginx_cache:
+  wp_data:
+  db_data:
+  elk_data:
+networks:
+  net:
+secrets:
+  mysql_root_password:
+    file: mysql_root_password.txt
+  wp_db_password:
+    file: wp_db_password.txt
