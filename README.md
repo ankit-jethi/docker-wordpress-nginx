@@ -35,7 +35,7 @@ You can access the website on ports 80 and 443 (With redirects to HTTPS).
 
 #### Web (Nginx):
 I have built my own image for Nginx based on **nginx:1.18.0-alpine** (Please refer to the 
-[Nginx config](https://github.com/ankit-jethi/docker-wordpress-nginx/new/master?readme=1#nginx-config) for details).  
+[Nginx config section](#nginx-config) for details).  
 Ports have mapped for 80 & 443 (With redirects to HTTPS).  
 Named volumes have beeen setup for storing cache & sharing wordpress files.
 
