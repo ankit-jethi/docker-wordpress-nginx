@@ -195,8 +195,19 @@ Prerequisites for setting up ELK:
 You can view the nmap count by running - `sysctl vm.max_map_count`    
 You can change it by running - `sysctl -w vm.max_map_count=262144`  
 To set this value permanently, update the **vm.max_map_count** setting in **/etc/sysctl.conf**. And to verify after rebooting, run `sysctl vm.max_map_count` again.
-3. The host's limits on open files must be increased: run `ulimit -n 65536` as root before starting Elasticsearch, or to set this value permanently, set **nofile** to 65536 in **/etc/security/limits.conf**.  
-And Docker's ulimit settings must also be adjusted, either for the container or globally: (e.g. in **/etc/sysconfig/docker**, add **OPTIONS="--default-ulimit nofile=1024:65536"**).
+3. The host's limits on open files must be increased: You can view the soft limit by running `ulimit -Sn` and hard limit by running `ulimit -Hn`. To set this value permanently, set **nofile to 65536 in /etc/security/limits.conf**.  
+And to adjust Docker's ulimit settings globally, create or edit **/etc/docker/daemon.json** and add the following lines:
+```
+{
+"default-ulimits": {
+    "nofile": {
+      "Name": "nofile",
+      "Hard": 65536,
+      "Soft": 1024
+    }
+  }
+}
+```
 Then, restart the docker service.
 
 Now, run in this directory:
@@ -251,7 +262,7 @@ Also, by default Elasticsearch has 30 seconds to start before other services are
 
 Building on the previous files, here are the differences:
 
->You cannot adjust the individual containers ulimit settings in docker swarm. For that you have to change the settings globally by editing **/etc/sysconfig/docker** & add **OPTIONS="--default-ulimit nofile=1024:65536"**. Then, restart the docker service.
+>You cannot adjust the individual containers ulimit settings in docker swarm. For that you have to change the settings globally by editing **/etc/docker/daemon.json**.
 
 Docker Swarm does support use of **configs** unlike docker-compose. So, using that instead of bind mount for the logstash configuration.  
 The following lines create a config called logstash_docker from a file called [logstash_docker.conf](../master/logstash_docker.conf) for use with the ELK service:
@@ -286,37 +297,64 @@ The following lines associate the config - logstash_docker with the ELK service:
 ## Nginx config:
 
 1. [Dockerfile](../master/nginx/Dockerfile)   
-Based on the official image - **nginx:1.18.0-alpine**.  
-Just added my own global nginx & virtual host configuration. Also, self-signed certificates & dhparam.
+
+\- Based on the official image - **nginx:1.18.0-alpine**.  
+\- Just added my own global nginx & virtual host configuration. Also, self-signed certificates & dhparam.
 
 2. Global nginx configuration - [nginx.conf](../master/nginx/nginx.conf):    
-Adjust the worker_connections as per demand.  
-Configure the worker_rlimit_nofile directive to adjust the nofile settings.  
-Configure settings for gzip & gunzip.  
-Also, adjust the keep_alive timeout.
+
+\- Adjust the worker_connections as per demand.  
+\- Configure the worker_rlimit_nofile directive to adjust the nofile settings.  
+\- Configure settings for gzip & gunzip.  
+\- Also, adjust the keep_alive timeout.
 
 3. Virtual host configuration - [blog.example.com.conf](../master/nginx/blog.example.com.conf):  
-Setup caching.  
-Setup redirects to HTTPS.  
-Setup HTTP2.  
-Setup the self-signed ssl certificates.  
-Setup some more ssl configuration - timeout, cache, dhparam, protocols, ciphers.  
-Setup HSTS.  
-Setup OCSP stapling (Cannot be used with self-signed certs).  
-Setup Reverse proxy to WordPress.  
-Setup header to check cache status.
+
+\- Setup caching.  
+\- Setup redirects to HTTPS.  
+\- Setup HTTP2.  
+\- Setup the self-signed ssl certificates.  
+\- Setup some more ssl configuration - timeout, cache, dhparam, protocols, ciphers.  
+\- Setup HSTS.  
+\- Setup OCSP stapling (Cannot be used with self-signed certs).  
+\- Setup Reverse proxy to WordPress.  
+\- Setup header to check cache status.
 
 4. SSL directory:  
-Includes self-signed certificates & dhparam.
+
+\- Includes self-signed certificates & dhparam.
 
 ## Logstash config - [logstash_docker.conf](../master/logstash_docker.conf):
 
 1. Input:  
-This is where the logstash service sets up the incoming port for the docker gelf logging driver.
+
+\- This is where the logstash service sets up the incoming port for the docker gelf logging driver.
 
 2. Filter:  
-Every service (Nginx, WordPress & MariaDB) was tagged in the compose files. You can use those tags and apply grok pattern to each service & map them with fields for use with Elasticsearch.  
-As an example, the nginx access logs & error logs have been mapped.
+
+\- Every service (Nginx, WordPress & MariaDB) was tagged in the compose files. You can use those tags and apply grok pattern to each service & map them with fields for use with Elasticsearch.  
+\- As an example, the nginx access logs & error logs have been mapped.
 
 3. Output:  
-The output is sent to Elasticsearch with the specified index prefix.
+
+\- The output is sent to Elasticsearch with the specified index prefix.
+
+
+### Sources:
+1. [Manage sensitive data with Docker secrets](https://docs.docker.com/engine/swarm/secrets/)
+2. [Store configuration data using Docker Configs](https://docs.docker.com/engine/swarm/configs/)
+3. [Compose file version 3 reference](https://docs.docker.com/compose/compose-file/)
+4. [Example Docker Compose app](https://github.com/dockersamples/example-voting-app)
+5. [Tips for Deploying Nginx with Docker](https://www.docker.com/blog/tips-for-deploying-nginx-official-image-with-docker/)
+6. [Mozilla Security/Server Side TLS](https://wiki.mozilla.org/Security/Server_Side_TLS)
+7. [Mozilla SSL Configuration Generator](https://ssl-config.mozilla.org/)
+8. [Ulimits in compose file](https://docs.docker.com/compose/compose-file/#ulimits)
+9. [Docker daemon configuration file](https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-configuration-file)
+10. [REX-Ray - AWS EFS volume plugin](https://rexray.readthedocs.io/en/stable/user-guide/schedulers/docker/plug-ins/aws/#aws-efs)
+11. [Make Stateful Applications Highly Available w/ Docker Swarm Mode (and Docker plugins!)](https://www.youtube.com/watch?v=U8Dsi5V-XG0)
+12. [Docker Storage: Designing a Platform for Persistent Data](https://www.youtube.com/watch?v=y5wMbA_T0tA)
+13. [Docker Lab - Swarm Mode, Setup shared storage between VMs & ELK stack](https://github.com/cloud-coder/docker-lab-2016/tree/master/part-3)
+14. [ELK Docker image documentation](https://elk-docker.readthedocs.io/)
+15. [Docker - Log Driver - ELK](https://www.youtube.com/watch?v=eM8H2c7L_Iw)
+16. [Send docker logs to ELK through gelf log driver](https://gist.github.com/eunomie/e7a183602b8734c47058d277700fdc2d)
+17. [Graylog Extended Format logging driver](https://docs.docker.com/config/containers/logging/gelf/)
